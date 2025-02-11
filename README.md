@@ -1,4 +1,5 @@
 # qrlyzer 
+[![CI](https://github.com/netlifeas/qrlyzer/actions/workflows/CI.yml/badge.svg)](https://github.com/netlifeas/qrlyzer/actions/workflows/CI.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 qrlyzer is an extremely simple and lightweight Python module for reading QR codes from images.
 
