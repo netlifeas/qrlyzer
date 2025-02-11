@@ -18,3 +18,9 @@ maintainers = [
 features = ["pyo3/extension-module"]
 sdist-include = ["LICENSE", "README.md"]
 include = [{ path = "THIRD_PARTY_LICENSES", format = "wheel" }]
+
+[tool.maturin.target.x86_64-apple-darwin]
+macos-deployment-target = "10.15"
+
+[tool.maturin.target.aarch64-apple-darwin]
+macos-deployment-target = "11.0"
