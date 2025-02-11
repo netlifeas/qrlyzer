@@ -1,0 +1,19 @@
+[build-system]
+requires = ["maturin>=1.8,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "qrlyzer"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+dynamic = ["version"]
+maintainers = [
+    {name = "Nikolai Ugelvik", email = "nikolai@netlife.no"}
+]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+sdist-include = ["LICENSE", "README.md"]
