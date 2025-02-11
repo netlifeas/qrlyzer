@@ -17,3 +17,4 @@ maintainers = [
 [tool.maturin]
 features = ["pyo3/extension-module"]
 sdist-include = ["LICENSE", "README.md"]
+include = [{ path = "THIRD_PARTY_LICENSES", format = "wheel" }]
