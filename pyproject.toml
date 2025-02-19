@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "qrlyzer"
-description = "qrlyzer is an extremely simple and lightweight Python module for reading QR codes from images."
+description = "qrlyzer is a lightweight Python module for reading QR codes from images."
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Rust",
@@ -21,7 +21,7 @@ Issues = "https://github.com/netlifeas/qrlyzer/issues"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
-sdist-include = ["LICENSE", "README.md"]
+sdist-include = ["LICENSE", "README.md", "THIRD_PARTY_LICENSES"]
 include = [{ path = "THIRD_PARTY_LICENSES", format = "wheel" }]
 
 [tool.maturin.target.x86_64-apple-darwin]
