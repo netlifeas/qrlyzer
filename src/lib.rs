@@ -34,7 +34,7 @@ fn detect_and_decode_from_bytes(
 ) -> PyResult<Vec<String>> {
     py.allow_threads(move || {
         let mut decoded: Vec<String> = Vec::new();
-        if data.len() != (width * height) as usize {
+        if data.len() != (width as usize * height as usize) {
             return PyResult::Err(PyValueError::new_err(
                 "Data length does not match width and height",
             ));
@@ -72,7 +72,7 @@ fn do_detect_and_decode(image: &GrayImage, auto_resize: bool) -> Option<Vec<Stri
 
         for scale in (0..=scale_steps)
             .rev()
-            .map(|x| min_scale + (max_scale - min_scale) * x as f32 / scale_steps as f32)
+            .map(|step| min_scale + (max_scale - min_scale) * step as f32 / scale_steps as f32)
         {
             let resized = resize_image(&scale_src, scale);
             if let Some(resized) = resized {
@@ -101,7 +101,7 @@ fn with_rqrr(image: GrayImage) -> Vec<String> {
     let mut result = Vec::new();
     let mut prepared_image = rqrr::PreparedImage::prepare(image);
     let grids = prepared_image.detect_grids();
-    for grid in grids.iter() {
+    for grid in grids.into_iter() {
         let decode_result = grid.decode();
         let (_meta, content) = match decode_result {
             Ok((meta, content)) => (meta, content),
