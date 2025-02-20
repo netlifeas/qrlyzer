@@ -81,7 +81,7 @@ fn do_detect_and_decode(image: &GrayImage, auto_resize: bool) -> Option<Vec<Stri
                 if decoded.len() > 0 {
                     return Some(decoded);
                 }
-                decoded.extend(with_rxing(&image));
+                decoded.extend(with_rxing(&resized));
                 if decoded.len() > 0 {
                     break;
                 }
