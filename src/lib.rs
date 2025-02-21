@@ -74,6 +74,9 @@ fn do_detect_and_decode(image: &GrayImage, auto_resize: bool) -> Option<Vec<Stri
             .rev()
             .map(|step| min_scale + (max_scale - min_scale) * step as f32 / scale_steps as f32)
         {
+            if scale >= 1.0 {
+                break;
+            }
             let resized = resize_image(&scale_src, scale);
             if let Some(resized) = resized {
                 let luma8_otsu = apply_threshold(&resized);
