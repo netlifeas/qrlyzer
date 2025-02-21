@@ -20,7 +20,7 @@ macro_rules! try_return {
 /// Scan QR codes from an image given as a path.
 #[pyfunction]
 #[pyo3(signature = (path, auto_resize=false))]
-fn detect_and_decode(py: Python, path: &str, auto_resize: bool) -> PyResult<Vec<String>> {
+pub fn detect_and_decode(py: Python, path: &str, auto_resize: bool) -> PyResult<Vec<String>> {
     // Entry point for QR code detection from a file path.
     py.allow_threads(move || {
         let mut decoded: Vec<String> = Vec::new();
@@ -35,7 +35,7 @@ fn detect_and_decode(py: Python, path: &str, auto_resize: bool) -> PyResult<Vec<
 /// Scan QR codes from a grayscale image given in bytes.
 #[pyfunction]
 #[pyo3(signature = (data, width, height, auto_resize=false))]
-fn detect_and_decode_from_bytes(
+pub fn detect_and_decode_from_bytes(
     py: Python,
     data: Vec<u8>,
     width: u32,
