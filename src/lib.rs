@@ -21,6 +21,7 @@ macro_rules! try_return {
 #[pyfunction]
 #[pyo3(signature = (path, auto_resize=false))]
 fn detect_and_decode(py: Python, path: &str, auto_resize: bool) -> PyResult<Vec<String>> {
+    // Entry point for QR code detection from a file path.
     py.allow_threads(move || {
         let mut decoded: Vec<String> = Vec::new();
         let image = load_image(path)?;
@@ -41,6 +42,7 @@ fn detect_and_decode_from_bytes(
     height: u32,
     auto_resize: bool,
 ) -> PyResult<Vec<String>> {
+    // Entry point for QR code detection from raw image bytes.
     py.allow_threads(move || {
         let mut decoded: Vec<String> = Vec::new();
         if data.len() != (width as usize * height as usize) {
@@ -63,11 +65,12 @@ fn detect_and_decode_from_bytes(
 fn do_detect_and_decode(image: &GrayImage, auto_resize: bool) -> Option<Vec<String>> {
     let mut decoded: Vec<String> = Vec::new();
     if auto_resize {
-        // This range seems to be a good detection range based on tests
+        // Determine scaling factor range based on image dimensions.
         let min_scale = 100.0 / (image.width().max(image.height())) as f32;
         let max_scale = 1280.0 / (image.width().max(image.height())) as f32;
         let scale_steps = 5;
 
+        // Prepare source image for resizing.
         let scale_src_result = fr::images::Image::from_vec_u8(
             image.width(),
             image.height(),
@@ -79,6 +82,7 @@ fn do_detect_and_decode(image: &GrayImage, auto_resize: bool) -> Option<Vec<Stri
             Err(_) => return None,
         };
 
+        // Iterate through defined scaling steps (reverse order for efficiency).
         for scale in (0..=scale_steps)
             .rev()
             .map(|step| min_scale + (max_scale - min_scale) * step as f32 / scale_steps as f32)
@@ -86,6 +90,7 @@ fn do_detect_and_decode(image: &GrayImage, auto_resize: bool) -> Option<Vec<Stri
             if scale >= 1.0 {
                 break;
             }
+            // Resize image and apply thresholding to enhance QR detection.
             let resized = resize_image(&scale_src, scale);
             if let Some(resized) = resized {
                 let luma8_otsu = apply_threshold(&resized);
@@ -94,6 +99,7 @@ fn do_detect_and_decode(image: &GrayImage, auto_resize: bool) -> Option<Vec<Stri
             }
         }
     }
+    // Process non-resized image.
     let luma8_otsu = apply_threshold(&image);
     try_return!(decoded, with_rqrr(luma8_otsu));
     try_return!(decoded, with_rxing(&image));
@@ -101,10 +107,12 @@ fn do_detect_and_decode(image: &GrayImage, auto_resize: bool) -> Option<Vec<Stri
 }
 
 fn with_rqrr(image: GrayImage) -> Vec<String> {
+    // Uses the rqrr library for QR code detection.
     let mut result = Vec::new();
     let mut prepared_image = rqrr::PreparedImage::prepare(image);
     let grids = prepared_image.detect_grids();
     for grid in grids.into_iter() {
+        // Attempt to decode each detected grid.
         let decode_result = grid.decode();
         let (_meta, content) = match decode_result {
             Ok((meta, content)) => (meta, content),
@@ -116,13 +124,12 @@ fn with_rqrr(image: GrayImage) -> Vec<String> {
 }
 
 fn with_rxing(image: &GrayImage) -> Vec<String> {
+    // Uses the rxing library, with a 'TryHarder' hint, for QR code detection.
     let mut result = Vec::new();
-
     let mut dch = DecodeHints {
         TryHarder: Some(true),
         ..Default::default()
     };
-
     let decode_result = rxing::helpers::detect_in_luma_with_hints(
         image.to_vec(),
         image.width(),
@@ -139,6 +146,7 @@ fn with_rxing(image: &GrayImage) -> Vec<String> {
 }
 
 fn load_image(path: &str) -> PyResult<GrayImage> {
+    // Loads an image from a given path and converts it to grayscale.
     let image = image::open(path);
     match image {
         Ok(image) => Ok(image.to_luma8()),
@@ -147,11 +155,13 @@ fn load_image(path: &str) -> PyResult<GrayImage> {
 }
 
 fn apply_threshold(image: &GrayImage) -> GrayImage {
+    // Applies Otsu's thresholding to enhance the image contrast.
     let ol = otsu_level(&image);
     threshold(&image, ol, ThresholdType::Binary)
 }
 
 fn resize_image(image: &fr::images::Image, target_scale: f32) -> Option<GrayImage> {
+    // Resizes the image based on the target scale and converts it back to a GrayImage.
     let mut dst_image = fr::images::Image::new(
         (image.width() as f32 * target_scale) as u32,
         (image.height() as f32 * target_scale) as u32,
