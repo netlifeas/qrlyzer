@@ -24,7 +24,7 @@ def detect_and_decode_from_bytes(
     data: bytes, width: int, height: int, auto_resize: bool = False
 ) -> List[str]:
     """
-    Scans raw a grayscale image bytes for QR codes.
+    Scans raw grayscale image bytes for QR codes.
 
     Constructs a grayscale image from the bytes and applies thresholding. If auto_resize is enabled,
     the image is resized at various scales to improve detection using multiple libraries.
