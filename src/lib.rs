@@ -8,6 +8,15 @@ use pyo3::{
 use rqrr;
 use rxing::{self, BarcodeFormat, DecodeHints};
 
+macro_rules! try_return {
+    ($decoded:expr, $new:expr) => {{
+        $decoded.extend($new);
+        if !$decoded.is_empty() {
+            return Some($decoded);
+        }
+    }};
+}
+
 /// Scan QR codes from an image given as a path.
 #[pyfunction]
 #[pyo3(signature = (path, auto_resize=false))]
@@ -80,23 +89,14 @@ fn do_detect_and_decode(image: &GrayImage, auto_resize: bool) -> Option<Vec<Stri
             let resized = resize_image(&scale_src, scale);
             if let Some(resized) = resized {
                 let luma8_otsu = apply_threshold(&resized);
-                decoded.extend(with_rqrr(luma8_otsu));
-                if decoded.len() > 0 {
-                    return Some(decoded);
-                }
-                decoded.extend(with_rxing(&resized));
-                if decoded.len() > 0 {
-                    break;
-                }
+                try_return!(decoded, with_rqrr(luma8_otsu));
+                try_return!(decoded, with_rxing(&resized));
             }
         }
     }
     let luma8_otsu = apply_threshold(&image);
-    decoded.extend(with_rqrr(luma8_otsu));
-    if decoded.len() > 0 {
-        return Some(decoded);
-    }
-    decoded.extend(with_rxing(&image));
+    try_return!(decoded, with_rqrr(luma8_otsu));
+    try_return!(decoded, with_rxing(&image));
     Some(decoded)
 }
 
