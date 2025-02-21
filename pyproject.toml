@@ -18,6 +18,7 @@ maintainers = [
 [project.urls]
 Repository = "https://github.com/netlifeas/qrlyzer.git"
 Issues = "https://github.com/netlifeas/qrlyzer/issues"
+Changelog = "https://github.com/netlifeas/qrlyzer/releases"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
