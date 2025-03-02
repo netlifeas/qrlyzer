@@ -1,5 +1,6 @@
 # qrlyzer 
-[![CI](https://github.com/netlifeas/qrlyzer/actions/workflows/CI.yml/badge.svg)](https://github.com/netlifeas/qrlyzer/actions/workflows/CI.yml) [![Tests](https://github.com/netlifeas/qrlyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/netlifeas/qrlyzer/actions/workflows/tests.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/netlifeas/qrlyzer/actions/workflows/CI.yml/badge.svg)](https://github.com/netlifeas/qrlyzer/actions/workflows/CI.yml) [![Tests](https://github.com/netlifeas/qrlyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/netlifeas/qrlyzer/actions/workflows/tests.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/qrlyzer)
+
 
 qrlyzer is a lightweight Python module for reading QR codes from images. It offers an optional auto-resizing feature that leverages fast_image_resize to utilize SIMD instructions for enhanced performance.
 
