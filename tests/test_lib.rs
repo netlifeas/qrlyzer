@@ -77,3 +77,23 @@ fn test_detect_and_decode_success_bytes() {
         assert_eq!(result, vec!["qrlyzer".to_string()]);
     });
 }
+
+#[test]
+fn test_detect_and_decode_success_file_requires_resize() {
+    pyo3::prepare_freethreaded_python();
+    Python::with_gil(|py| {
+        let file_path = "tests/fixtures/test_resize.png";
+        let result = detect_and_decode(py, file_path, true).unwrap();
+        assert_eq!(result, vec!["qrlyzer".to_string()]);
+    });
+}
+
+#[test]
+fn test_detect_and_decode_failure_file_requires_resize() {
+    pyo3::prepare_freethreaded_python();
+    Python::with_gil(|py| {
+        let file_path = "tests/fixtures/test_resize.png";
+        let result = detect_and_decode(py, file_path, false).unwrap();
+        assert_eq!(result, [] as [&str; 0]);
+    });
+}

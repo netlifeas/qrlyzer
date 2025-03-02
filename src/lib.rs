@@ -1,6 +1,6 @@
 use fast_image_resize as fr;
 use image::GrayImage;
-use imageproc::contrast::{otsu_level, threshold, ThresholdType};
+use imageproc::contrast::{ThresholdType, otsu_level, threshold};
 use pyo3::{
     exceptions::{PyIOError, PyValueError},
     prelude::*,
