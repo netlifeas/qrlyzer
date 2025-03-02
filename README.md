@@ -35,11 +35,12 @@ print(f"Found QR codes: {qr_codes}")
 ```
 
 #### Using auto-resizing
-pass the ```auto_resize``` parameter to enable automatic resizing (from 100px to 1280px in the largest direction. 5 steps). These dimensions seem to be a good detection range for the libraries used.
+Pass the ```auto_resize``` parameter to enable automatic resizing (from 100px to 1280px in the largest direction. 5 steps). These dimensions seem to be a good detection range for the libraries used.
 ```python
 # Auto-scaling
 qrlyzer.detect_and_decode("my_image.jpg", auto_resize=True)
 ```
+Note: This can in some cases increase accuracy as well as speed, especially for large images where there is a QR code. If an image does not contain a QR code or the QR code is unreadable it will be slower.
 
 ## Uses 
 
