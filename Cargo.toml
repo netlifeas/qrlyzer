@@ -9,7 +9,7 @@ name = "qrlyzer"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-fast_image_resize = "5.1.2"
+fast_image_resize = { version = "5.1.2", features = ["image"] }
 image = "0.25.5"
 imageproc = "0.25.0"
 pyo3 = "0.23.3"
