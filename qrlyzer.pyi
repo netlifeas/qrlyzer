@@ -8,7 +8,7 @@ def detect_and_decode(
     Scans an image file for QR codes.
 
     Loads the image from the given path, converts it to grayscale, and applies
-    thresholding. If auto_resize is enabled, the image is resized at multiple scales
+    thresholding. If ``auto_resize`` is enabled, the image is resized at multiple scales
     to improve QR code detection using different libraries.
 
     Args:
@@ -26,8 +26,8 @@ def detect_and_decode_from_bytes(
     """
     Scans raw grayscale image bytes for QR codes.
 
-    Constructs a grayscale image from the bytes and applies thresholding. If auto_resize is enabled,
-    the image is resized at various scales to improve detection using multiple libraries.
+    Constructs a grayscale image from the bytes and applies thresholding. If ``auto_resize`` is
+    enabled, the image is resized at various scales to improve detection using multiple libraries.
 
     Args:
         data: Raw byte data of the grayscale image.
