@@ -1,6 +1,6 @@
 use fast_image_resize as fr;
-use image::GrayImage;
-use imageproc::contrast::{ThresholdType, otsu_level, threshold};
+use image::{DynamicImage, GrayImage};
+use imageproc::contrast::{otsu_level, threshold, ThresholdType};
 use pyo3::{
     exceptions::{PyIOError, PyValueError},
     prelude::*,
@@ -25,6 +25,7 @@ pub fn detect_and_decode(py: Python, path: &str, auto_resize: bool) -> PyResult<
     py.allow_threads(move || {
         let mut decoded: Vec<String> = Vec::new();
         let image = load_image(path)?;
+        let image = DynamicImage::from(image.into_luma8());
         if let Some(result) = do_detect_and_decode(&image, auto_resize) {
             decoded.extend(result);
         }
@@ -52,7 +53,7 @@ pub fn detect_and_decode_from_bytes(
         }
         let image_result = GrayImage::from_raw(width, height, data);
         let image = match image_result {
-            Some(image) => image,
+            Some(image) => DynamicImage::from(image),
             None => return PyResult::Err(PyValueError::new_err("Could not create image")),
         };
         if let Some(result) = do_detect_and_decode(&image, auto_resize) {
@@ -62,25 +63,13 @@ pub fn detect_and_decode_from_bytes(
     })
 }
 
-fn do_detect_and_decode(image: &GrayImage, auto_resize: bool) -> Option<Vec<String>> {
+fn do_detect_and_decode(image: &DynamicImage, auto_resize: bool) -> Option<Vec<String>> {
     let mut decoded: Vec<String> = Vec::new();
     if auto_resize {
         // Determine scaling factor range based on image dimensions.
         let min_scale = 100.0 / (image.width().max(image.height())) as f32;
         let max_scale = 1280.0 / (image.width().max(image.height())) as f32;
         let scale_steps = 5;
-
-        // Prepare source image for resizing.
-        let scale_src_result = fr::images::Image::from_vec_u8(
-            image.width(),
-            image.height(),
-            image.to_vec(),
-            fr::PixelType::U8,
-        );
-        let scale_src = match scale_src_result {
-            Ok(image) => image,
-            Err(_) => return None,
-        };
 
         // Iterate through defined scaling steps (reverse order for efficiency).
         for scale in (0..=scale_steps)
@@ -91,17 +80,17 @@ fn do_detect_and_decode(image: &GrayImage, auto_resize: bool) -> Option<Vec<Stri
                 break;
             }
             // Resize image and apply thresholding to enhance QR detection.
-            let resized = resize_image(&scale_src, scale);
+            let resized = resize_image(&image, scale);
             if let Some(resized) = resized {
-                let luma8_otsu = apply_threshold(&resized);
-                try_return!(decoded, with_rqrr(luma8_otsu));
+                let thresholded = apply_threshold(&resized);
+                try_return!(decoded, with_rqrr(thresholded.into_luma8()));
                 try_return!(decoded, with_rxing(&resized));
             }
         }
     }
     // Process non-resized image.
-    let luma8_otsu = apply_threshold(&image);
-    try_return!(decoded, with_rqrr(luma8_otsu));
+    let thresholded = apply_threshold(&image);
+    try_return!(decoded, with_rqrr(thresholded.into_luma8()));
     try_return!(decoded, with_rxing(&image));
     Some(decoded)
 }
@@ -123,7 +112,7 @@ fn with_rqrr(image: GrayImage) -> Vec<String> {
     result
 }
 
-fn with_rxing(image: &GrayImage) -> Vec<String> {
+fn with_rxing(image: &DynamicImage) -> Vec<String> {
     // Uses the rxing library, with a 'TryHarder' hint, for QR code detection.
     let mut result = Vec::new();
     let mut dch = DecodeHints {
@@ -131,7 +120,7 @@ fn with_rxing(image: &GrayImage) -> Vec<String> {
         ..Default::default()
     };
     let decode_result = rxing::helpers::detect_in_luma_with_hints(
-        image.to_vec(),
+        image.to_luma8().into_vec(),
         image.width(),
         image.height(),
         Some(BarcodeFormat::QR_CODE),
@@ -145,38 +134,43 @@ fn with_rxing(image: &GrayImage) -> Vec<String> {
     result
 }
 
-fn load_image(path: &str) -> PyResult<GrayImage> {
+fn load_image(path: &str) -> PyResult<DynamicImage> {
     // Loads an image from a given path and converts it to grayscale.
     let image = image::open(path);
     match image {
-        Ok(image) => Ok(image.to_luma8()),
+        Ok(image) => PyResult::Ok(image),
         Err(_) => return PyResult::Err(PyIOError::new_err("Could not load image")),
     }
 }
 
-fn apply_threshold(image: &GrayImage) -> GrayImage {
+fn apply_threshold(image: &DynamicImage) -> DynamicImage {
     // Applies Otsu's thresholding to enhance the image contrast.
-    let ol = otsu_level(&image);
-    threshold(&image, ol, ThresholdType::Binary)
+
+    let luma8 = match image.as_luma8() {
+        Some(luma8) => luma8,
+        None => {
+            // This should never happen, but if it does, return a copy of the original image.
+            return image.clone();
+        }
+    };
+
+    let thresh = otsu_level(&luma8);
+    DynamicImage::from(threshold(&luma8, thresh, ThresholdType::Binary))
 }
 
-fn resize_image(image: &fr::images::Image, target_scale: f32) -> Option<GrayImage> {
+fn resize_image(image: &DynamicImage, target_scale: f32) -> Option<DynamicImage> {
     // Resizes the image based on the target scale and converts it back to a GrayImage.
-    let mut dst_image = fr::images::Image::new(
+    let mut dst_image = DynamicImage::new_luma8(
         (image.width() as f32 * target_scale) as u32,
         (image.height() as f32 * target_scale) as u32,
-        fr::PixelType::U8,
     );
+
     let mut resizer = fr::Resizer::new();
     let dst_image = match resizer.resize(image, &mut dst_image, &fr::ResizeOptions::default()) {
         Ok(_) => dst_image,
         Err(_) => return None,
     };
-    GrayImage::from_raw(
-        dst_image.width(),
-        dst_image.height(),
-        dst_image.buffer().to_vec(),
-    )
+    Some(dst_image)
 }
 
 /// qrlyzer QR code reader module.
