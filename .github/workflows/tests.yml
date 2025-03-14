@@ -25,10 +25,15 @@ jobs:
       - name: Create and start virtual environment
         run: |
           python3 -m venv .venv
-          source .venv/bin/activate
       - name: Install Python dependencies
-        run: pip install maturin pytest Pillow
+        run: |
+          source .venv/bin/activate
+          pip install maturin pytest Pillow
       - name: Build and install Python wheel
-        run: maturin develop
+        run: |
+          source .venv/bin/activate
+          maturin develop
       - name: Test Python wheel
-        run: pytest -v .
+        run: |
+          source .venv/bin/activate
+          pytest -v .
