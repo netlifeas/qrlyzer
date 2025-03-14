@@ -28,7 +28,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           source .venv/bin/activate
-          pip install .[test]
+          pip install maturin pytest Pillow
       - name: Build and install Python wheel
         run: |
           source .venv/bin/activate

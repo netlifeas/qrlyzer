@@ -40,10 +40,3 @@ macos-deployment-target = "10.15"
 
 [tool.maturin.target.aarch64-apple-darwin]
 macos-deployment-target = "11.0"
-
-[project.optional-dependencies]
-test = [
-    "maturin>=1.8,<2.0",
-    "Pillow>=10.0.0",
-    "pytest>=8.0.0",
-]
