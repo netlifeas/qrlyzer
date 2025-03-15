@@ -21,7 +21,6 @@ macro_rules! try_return {
 #[pyfunction]
 #[pyo3(signature = (path, auto_resize=false))]
 pub fn detect_and_decode(py: Python, path: &str, auto_resize: bool) -> PyResult<Vec<String>> {
-    // Entry point for QR code detection from a file path.
     py.allow_threads(move || {
         let mut decoded: Vec<String> = Vec::new();
         let image = load_image(path)?;
@@ -43,7 +42,6 @@ pub fn detect_and_decode_from_bytes(
     height: u32,
     auto_resize: bool,
 ) -> PyResult<Vec<String>> {
-    // Entry point for QR code detection from raw image bytes.
     py.allow_threads(move || {
         let mut decoded: Vec<String> = Vec::new();
         if data.len() != (width as usize * height as usize) {
@@ -79,7 +77,6 @@ fn do_detect_and_decode(image: &DynamicImage, auto_resize: bool) -> Option<Vec<S
             if scale >= 1.0 {
                 break;
             }
-            // Resize image and apply thresholding to enhance QR detection.
             let resized = resize_image(&image, scale);
             if let Some(resized) = resized {
                 let thresholded = apply_threshold(&resized);
@@ -88,7 +85,6 @@ fn do_detect_and_decode(image: &DynamicImage, auto_resize: bool) -> Option<Vec<S
             }
         }
     }
-    // Process non-resized image.
     let thresholded = apply_threshold(&image);
     try_return!(decoded, with_rqrr(thresholded.into_luma8()));
     try_return!(decoded, with_rxing(&image));
@@ -135,7 +131,6 @@ fn with_rxing(image: &DynamicImage) -> Vec<String> {
 }
 
 fn load_image(path: &str) -> PyResult<DynamicImage> {
-    // Loads an image from a given path and converts it to grayscale.
     let image = image::open(path);
     match image {
         Ok(image) => PyResult::Ok(image),
