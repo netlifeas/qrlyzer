@@ -138,9 +138,8 @@ fn load_image(path: &str) -> PyResult<DynamicImage> {
     }
 }
 
+/// Applies Otsu's thresholding to enhance the image contrast.
 fn apply_threshold(image: &DynamicImage) -> DynamicImage {
-    // Applies Otsu's thresholding to enhance the image contrast.
-
     let luma8 = match image.as_luma8() {
         Some(luma8) => luma8,
         None => {
@@ -153,8 +152,8 @@ fn apply_threshold(image: &DynamicImage) -> DynamicImage {
     DynamicImage::from(threshold(&luma8, thresh, ThresholdType::Binary))
 }
 
+/// Resizes the image based on the target scale and converts it back to a GrayImage.
 fn resize_image(image: &DynamicImage, target_scale: f32) -> Option<DynamicImage> {
-    // Resizes the image based on the target scale and converts it back to a GrayImage.
     let mut dst_image = DynamicImage::new_luma8(
         (image.width() as f32 * target_scale) as u32,
         (image.height() as f32 * target_scale) as u32,
