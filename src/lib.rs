@@ -8,6 +8,13 @@ use pyo3::{
 use rqrr;
 use rxing::{self, BarcodeFormat, DecodeHints};
 
+/// Minimum target dimension for resizing the image.
+const MIN_TARGET_DIMENSION: f32 = 100.0;
+/// Maximum target dimension for resizing the image.
+const MAX_TARGET_DIMENSION: f32 = 1280.0;
+/// Number of scaling steps to apply when resizing the image.
+const RESIZE_SCALE_STEPS: u32 = 5;
+
 macro_rules! try_return {
     ($decoded:expr, $new:expr) => {{
         $decoded.extend($new);
@@ -65,15 +72,13 @@ fn do_detect_and_decode(image: &DynamicImage, auto_resize: bool) -> Option<Vec<S
     let mut decoded: Vec<String> = Vec::new();
     if auto_resize {
         // Determine scaling factor range based on image dimensions.
-        let min_scale = 100.0 / (image.width().max(image.height())) as f32;
-        let max_scale = 1280.0 / (image.width().max(image.height())) as f32;
-        let scale_steps = 5;
+        let min_scale = MIN_TARGET_DIMENSION / (image.width().max(image.height())) as f32;
+        let max_scale = MAX_TARGET_DIMENSION / (image.width().max(image.height())) as f32;
 
-        // Iterate through defined scaling steps (reverse order for efficiency).
-        for scale in (0..=scale_steps)
-            .rev()
-            .map(|step| min_scale + (max_scale - min_scale) * step as f32 / scale_steps as f32)
-        {
+        // Iterate through the scaling steps (reverse order for efficiency).
+        for scale in (0..=RESIZE_SCALE_STEPS).rev().map(|step| {
+            min_scale + (max_scale - min_scale) * step as f32 / RESIZE_SCALE_STEPS as f32
+        }) {
             if scale >= 1.0 {
                 break;
             }
