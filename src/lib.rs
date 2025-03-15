@@ -139,7 +139,7 @@ fn load_image(path: &str) -> PyResult<DynamicImage> {
     let image = image::open(path);
     match image {
         Ok(image) => PyResult::Ok(image),
-        Err(_) => return PyResult::Err(PyIOError::new_err("Could not load image")),
+        Err(image_err) => return PyResult::Err(PyIOError::new_err(image_err.to_string())),
     }
 }
 
