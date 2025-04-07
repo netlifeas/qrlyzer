@@ -13,7 +13,7 @@ fast_image_resize = { version = "5.1.2", features = ["image"] }
 image = "0.25.5"
 imageproc = "0.25.0"
 pyo3 = "0.24.1"
-rqrr = "=0.9.0"
+rqrr = "0.9.0"
 rxing = "0.7.1"
 
 [profile.release]
