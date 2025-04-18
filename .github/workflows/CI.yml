@@ -193,5 +193,4 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            wheels-*/*.sigstore
-            wheels-*/*.sigstore-cert.pem
+            wheels-*/*.sigstore.json
