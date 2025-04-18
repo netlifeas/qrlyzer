@@ -5,12 +5,11 @@ build-backend = "maturin"
 [project]
 name = "qrlyzer"
 description = "qrlyzer is a lightweight Python module for reading QR codes from images."
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Rust",
     "Operating System :: OS Independent",
     "Intended Audience :: Developers",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
