@@ -186,7 +186,7 @@ jobs:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         with:
           command: upload
-          args: --non-interactive --skip-existing wheels-*/*
+          args: --non-interactive --skip-existing wheels-*/*.whl wheels-*/*.tar.gz
 
       - name: Upload signature files to GitHub Release
         uses: softprops/action-gh-release@v2
