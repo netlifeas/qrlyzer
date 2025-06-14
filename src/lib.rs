@@ -5,7 +5,6 @@ use pyo3::{
     exceptions::{PyIOError, PyValueError},
     prelude::*,
 };
-use rqrr;
 use rxing::{self, BarcodeFormat, DecodeHints};
 
 /// Minimum target dimension for resizing the image.
@@ -82,7 +81,7 @@ fn do_detect_and_decode(image: &DynamicImage, auto_resize: bool) -> Option<Vec<S
             if scale >= 1.0 {
                 break;
             }
-            let resized = resize_image(&image, scale);
+            let resized = resize_image(image, scale);
             if let Some(resized) = resized {
                 let thresholded = apply_threshold(&resized);
                 try_return!(decoded, with_rqrr(thresholded.into_luma8()));
@@ -90,9 +89,9 @@ fn do_detect_and_decode(image: &DynamicImage, auto_resize: bool) -> Option<Vec<S
             }
         }
     }
-    let thresholded = apply_threshold(&image);
+    let thresholded = apply_threshold(image);
     try_return!(decoded, with_rqrr(thresholded.into_luma8()));
-    try_return!(decoded, with_rxing(&image));
+    try_return!(decoded, with_rxing(image));
     Some(decoded)
 }
 
@@ -139,7 +138,7 @@ fn load_image(path: &str) -> PyResult<DynamicImage> {
     let image = image::open(path);
     match image {
         Ok(image) => PyResult::Ok(image),
-        Err(image_err) => return PyResult::Err(PyIOError::new_err(image_err.to_string())),
+        Err(image_err) => PyResult::Err(PyIOError::new_err(image_err.to_string())),
     }
 }
 
@@ -153,8 +152,8 @@ fn apply_threshold(image: &DynamicImage) -> DynamicImage {
         }
     };
 
-    let thresh = otsu_level(&luma8);
-    DynamicImage::from(threshold(&luma8, thresh, ThresholdType::Binary))
+    let thresh = otsu_level(luma8);
+    DynamicImage::from(threshold(luma8, thresh, ThresholdType::Binary))
 }
 
 /// Resizes the image based on the target scale and converts it back to a GrayImage.
