@@ -5,6 +5,7 @@ build-backend = "maturin"
 [project]
 name = "qrlyzer"
 description = "qrlyzer is a lightweight Python module for reading QR codes from images."
+readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Rust",
