@@ -4,8 +4,8 @@ use qrlyzer::{detect_and_decode, detect_and_decode_from_bytes};
 
 #[test]
 fn test_detect_and_decode_invalid_file() {
-    pyo3::prepare_freethreaded_python();
-    Python::with_gil(|py| {
+    Python::initialize();
+    Python::attach(|py| {
         let result = detect_and_decode(py, "non_existent_file.png", false);
         assert!(result.is_err());
     });
@@ -13,8 +13,8 @@ fn test_detect_and_decode_invalid_file() {
 
 #[test]
 fn test_detect_and_decode_from_bytes_invalid_dimensions() {
-    pyo3::prepare_freethreaded_python();
-    Python::with_gil(|py| {
+    Python::initialize();
+    Python::attach(|py| {
         // 10x10 image requires 100 bytes but using only 50 bytes
         let data = vec![0u8; 50];
         let result = detect_and_decode_from_bytes(py, data, 10, 10, false);
@@ -24,8 +24,8 @@ fn test_detect_and_decode_from_bytes_invalid_dimensions() {
 
 #[test]
 fn test_detect_and_decode_from_bytes_blank_image() {
-    pyo3::prepare_freethreaded_python();
-    Python::with_gil(|py| {
+    Python::initialize();
+    Python::attach(|py| {
         let width = 10;
         let height = 10;
         let data = vec![0u8; (width * height) as usize];
@@ -37,7 +37,7 @@ fn test_detect_and_decode_from_bytes_blank_image() {
 
 #[test]
 fn test_detect_and_decode_blank_image_file() {
-    pyo3::prepare_freethreaded_python();
+    Python::initialize();
     // Create a temporary blank grayscale image.
     let width = 10;
     let height = 10;
@@ -46,7 +46,7 @@ fn test_detect_and_decode_blank_image_file() {
     let file_path = temp_dir.join("test_blank.png");
     image.save(&file_path).unwrap();
 
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let result = detect_and_decode(py, file_path.to_str().unwrap(), false).unwrap();
         // Should return an empty vector as no QR code is present.
         assert!(result.is_empty());
@@ -58,8 +58,8 @@ fn test_detect_and_decode_blank_image_file() {
 
 #[test]
 fn test_detect_and_decode_success_file() {
-    pyo3::prepare_freethreaded_python();
-    Python::with_gil(|py| {
+    Python::initialize();
+    Python::attach(|py| {
         let file_path = "tests/fixtures/test.png";
         let result = detect_and_decode(py, file_path, false).unwrap();
         assert_eq!(result, vec!["qrlyzer".to_string()]);
@@ -68,8 +68,8 @@ fn test_detect_and_decode_success_file() {
 
 #[test]
 fn test_detect_and_decode_success_bytes() {
-    pyo3::prepare_freethreaded_python();
-    Python::with_gil(|py| {
+    Python::initialize();
+    Python::attach(|py| {
         let img = image::open("tests/fixtures/test.png").unwrap().to_luma8();
         let (width, height) = (img.width(), img.height());
         let data = img.into_vec();
@@ -80,8 +80,8 @@ fn test_detect_and_decode_success_bytes() {
 
 #[test]
 fn test_detect_and_decode_success_file_requires_resize() {
-    pyo3::prepare_freethreaded_python();
-    Python::with_gil(|py| {
+    Python::initialize();
+    Python::attach(|py| {
         let file_path = "tests/fixtures/test_resize.png";
         let result = detect_and_decode(py, file_path, true).unwrap();
         assert_eq!(result, vec!["qrlyzer".to_string()]);
@@ -90,8 +90,8 @@ fn test_detect_and_decode_success_file_requires_resize() {
 
 #[test]
 fn test_detect_and_decode_failure_file_requires_resize() {
-    pyo3::prepare_freethreaded_python();
-    Python::with_gil(|py| {
+    Python::initialize();
+    Python::attach(|py| {
         let file_path = "tests/fixtures/test_resize.png";
         let result = detect_and_decode(py, file_path, false).unwrap();
         assert_eq!(result, [] as [&str; 0]);

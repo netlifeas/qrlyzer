@@ -27,7 +27,7 @@ macro_rules! try_return {
 #[pyfunction]
 #[pyo3(signature = (path, auto_resize=false))]
 pub fn detect_and_decode(py: Python, path: &str, auto_resize: bool) -> PyResult<Vec<String>> {
-    py.allow_threads(move || {
+    py.detach(move || {
         let mut decoded: Vec<String> = Vec::new();
         let image = load_image(path)?;
         let image = DynamicImage::from(image.into_luma8());
@@ -48,7 +48,7 @@ pub fn detect_and_decode_from_bytes(
     height: u32,
     auto_resize: bool,
 ) -> PyResult<Vec<String>> {
-    py.allow_threads(move || {
+    py.detach(move || {
         let mut decoded: Vec<String> = Vec::new();
         if data.len() != (width as usize * height as usize) {
             return PyResult::Err(PyValueError::new_err(
