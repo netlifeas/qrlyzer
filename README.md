@@ -43,6 +43,20 @@ qrlyzer.detect_and_decode("my_image.jpg", auto_resize=True)
 ```
 Note: This can in some cases increase accuracy as well as speed, especially for large images where there is a QR code. If an image does not contain a QR code or the QR code is unreadable it will be slower.
 
+#### Getting decoded text with bounding boxes (`xywh`)
+Use the bbox variants to get both content and coordinates. The bbox format is `(x, y, width, height)`.
+```python
+results = qrlyzer.detect_and_decode_with_bbox("my_image.jpg")
+for content, (x, y, width, height) in results:
+    print(content, x, y, width, height)
+```
+
+```python
+results = qrlyzer.detect_and_decode_from_bytes_with_bbox(
+    im.tobytes(), im.width, im.height
+)
+```
+
 ## Uses 
 
 * [maturin](https://www.maturin.rs/) - Build & PyO3 bindings
@@ -61,4 +75,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 * Thanks to all the contributors to the maturin, rqrr, rxing & fast_image_resize projects.
-

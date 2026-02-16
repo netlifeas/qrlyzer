@@ -1,6 +1,17 @@
 use image::{GrayImage, Luma};
 use pyo3::Python;
-use qrlyzer::{detect_and_decode, detect_and_decode_from_bytes};
+use qrlyzer::{
+    detect_and_decode, detect_and_decode_from_bytes, detect_and_decode_from_bytes_with_bbox,
+    detect_and_decode_with_bbox,
+};
+
+fn assert_bbox_within_image(bbox: (u32, u32, u32, u32), width: u32, height: u32) {
+    let (x, y, w, h) = bbox;
+    assert!(w > 0);
+    assert!(h > 0);
+    assert!(x + w <= width);
+    assert!(y + h <= height);
+}
 
 #[test]
 fn test_detect_and_decode_invalid_file() {
@@ -95,5 +106,62 @@ fn test_detect_and_decode_failure_file_requires_resize() {
         let file_path = "tests/fixtures/test_resize.png";
         let result = detect_and_decode(py, file_path, false).unwrap();
         assert_eq!(result, [] as [&str; 0]);
+    });
+}
+
+#[test]
+fn test_detect_and_decode_with_bbox_success_file() {
+    Python::initialize();
+    Python::attach(|py| {
+        let file_path = "tests/fixtures/test.png";
+        let image = image::open(file_path).unwrap().to_luma8();
+        let result = detect_and_decode_with_bbox(py, file_path, false).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].0, "qrlyzer");
+        assert_bbox_within_image(result[0].1, image.width(), image.height());
+    });
+}
+
+#[test]
+fn test_detect_and_decode_with_bbox_success_file_requires_resize() {
+    Python::initialize();
+    Python::attach(|py| {
+        let file_path = "tests/fixtures/test_resize.png";
+        let image = image::open(file_path).unwrap().to_luma8();
+        let result = detect_and_decode_with_bbox(py, file_path, true).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].0, "qrlyzer");
+        assert_bbox_within_image(result[0].1, image.width(), image.height());
+    });
+}
+
+#[test]
+fn test_detect_and_decode_from_bytes_with_bbox_success() {
+    Python::initialize();
+    Python::attach(|py| {
+        let img = image::open("tests/fixtures/test.png").unwrap().to_luma8();
+        let (width, height) = (img.width(), img.height());
+        let data = img.into_vec();
+        let result =
+            detect_and_decode_from_bytes_with_bbox(py, data, width, height, false).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].0, "qrlyzer");
+        assert_bbox_within_image(result[0].1, width, height);
+    });
+}
+
+#[test]
+fn test_detect_and_decode_from_bytes_with_bbox_success_requires_resize() {
+    Python::initialize();
+    Python::attach(|py| {
+        let img = image::open("tests/fixtures/test_resize.png")
+            .unwrap()
+            .to_luma8();
+        let (width, height) = (img.width(), img.height());
+        let data = img.into_vec();
+        let result = detect_and_decode_from_bytes_with_bbox(py, data, width, height, true).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].0, "qrlyzer");
+        assert_bbox_within_image(result[0].1, width, height);
     });
 }
