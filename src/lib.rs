@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use fast_image_resize as fr;
 use image::{DynamicImage, GrayImage};
 use imageproc::contrast::{otsu_level, threshold, ThresholdType};
@@ -181,6 +183,7 @@ fn with_rxing_with_bbox(image: &DynamicImage) -> Vec<Detection> {
     // Uses the rxing library, with a 'TryHarder' hint, for QR code detection.
     let mut result = Vec::new();
     let mut dch = DecodeHints {
+        PossibleFormats: Some(HashSet::from([BarcodeFormat::QR_CODE])),
         TryHarder: Some(true),
         ..Default::default()
     };
