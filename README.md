@@ -4,6 +4,8 @@
 
 qrlyzer is a lightweight Python module for reading QR codes from images. It offers an optional auto-resizing feature that leverages fast_image_resize to utilize SIMD instructions for enhanced performance.
 
+There is at least one top level domain that started using the name qrlyzer after this projects' conception and release. This project is not affiliated nor does it condone the use of the name.
+
 ## Getting Started
 
 ### Installing
