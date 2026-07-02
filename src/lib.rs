@@ -40,7 +40,7 @@ macro_rules! try_return {
 pub fn detect_and_decode(py: Python, path: &str, auto_resize: bool) -> PyResult<Vec<String>> {
     py.detach(move || {
         let image = load_image(path)?;
-        Ok(do_detect_and_decode(&image, auto_resize).unwrap_or_default())
+        Ok(do_detect_and_decode(image, auto_resize).unwrap_or_default())
     })
 }
 
@@ -56,7 +56,7 @@ pub fn detect_and_decode_from_bytes(
 ) -> PyResult<Vec<String>> {
     py.detach(move || {
         let image = image_from_bytes(data, width, height)?;
-        Ok(do_detect_and_decode(&image, auto_resize).unwrap_or_default())
+        Ok(do_detect_and_decode(image, auto_resize).unwrap_or_default())
     })
 }
 
@@ -70,7 +70,7 @@ pub fn detect_and_decode_with_bbox(
 ) -> PyResult<Vec<DecodedWithBoundingBox>> {
     py.detach(move || {
         let image = load_image(path)?;
-        Ok(do_detect_and_decode_with_bbox(&image, auto_resize)
+        Ok(do_detect_and_decode_with_bbox(image, auto_resize)
             .unwrap_or_default()
             .into_iter()
             .map(|detection| (detection.content, detection.bbox))
@@ -90,7 +90,7 @@ pub fn detect_and_decode_from_bytes_with_bbox(
 ) -> PyResult<Vec<DecodedWithBoundingBox>> {
     py.detach(move || {
         let image = image_from_bytes(data, width, height)?;
-        Ok(do_detect_and_decode_with_bbox(&image, auto_resize)
+        Ok(do_detect_and_decode_with_bbox(image, auto_resize)
             .unwrap_or_default()
             .into_iter()
             .map(|detection| (detection.content, detection.bbox))
@@ -98,7 +98,7 @@ pub fn detect_and_decode_from_bytes_with_bbox(
     })
 }
 
-fn do_detect_and_decode(image: &GrayImage, auto_resize: bool) -> Option<Vec<String>> {
+fn do_detect_and_decode(image: GrayImage, auto_resize: bool) -> Option<Vec<String>> {
     do_detect_and_decode_with_bbox(image, auto_resize).map(|detections| {
         detections
             .into_iter()
@@ -107,12 +107,16 @@ fn do_detect_and_decode(image: &GrayImage, auto_resize: bool) -> Option<Vec<Stri
     })
 }
 
-fn do_detect_and_decode_with_bbox(image: &GrayImage, auto_resize: bool) -> Option<Vec<Detection>> {
+fn do_detect_and_decode_with_bbox(image: GrayImage, auto_resize: bool) -> Option<Vec<Detection>> {
     let mut decoded: Vec<Detection> = Vec::new();
+    let original_width = image.width();
+    let original_height = image.height();
+
     if auto_resize {
         // Determine scaling factor range based on image dimensions.
-        let min_scale = MIN_TARGET_DIMENSION / (image.width().max(image.height())) as f32;
-        let max_scale = MAX_TARGET_DIMENSION / (image.width().max(image.height())) as f32;
+        let max_dimension = original_width.max(original_height);
+        let min_scale = MIN_TARGET_DIMENSION / max_dimension as f32;
+        let max_scale = MAX_TARGET_DIMENSION / max_dimension as f32;
 
         // Iterate through the scaling steps (reverse order for efficiency).
         for scale in (0..=RESIZE_SCALE_STEPS).rev().map(|step| {
@@ -121,27 +125,27 @@ fn do_detect_and_decode_with_bbox(image: &GrayImage, auto_resize: bool) -> Optio
             if scale >= 1.0 {
                 break;
             }
-            let resized = resize_image(image, scale);
+            let resized = resize_image(&image, scale);
             if let Some(resized) = resized {
                 let thresholded = apply_threshold(&resized);
                 let rqrr_result = scale_detections_to_original(
                     with_rqrr_with_bbox(thresholded),
                     scale,
-                    image.width(),
-                    image.height(),
+                    original_width,
+                    original_height,
                 );
                 try_return!(decoded, rqrr_result);
                 let rxing_result = scale_detections_to_original(
-                    with_rxing_with_bbox(&resized),
+                    with_rxing_with_bbox(resized),
                     scale,
-                    image.width(),
-                    image.height(),
+                    original_width,
+                    original_height,
                 );
                 try_return!(decoded, rxing_result);
             }
         }
     }
-    let thresholded = apply_threshold(image);
+    let thresholded = apply_threshold(&image);
     try_return!(decoded, with_rqrr_with_bbox(thresholded));
     try_return!(decoded, with_rxing_with_bbox(image));
     Some(decoded)
@@ -174,18 +178,20 @@ fn with_rqrr_with_bbox(image: GrayImage) -> Vec<Detection> {
     result
 }
 
-fn with_rxing_with_bbox(image: &GrayImage) -> Vec<Detection> {
+fn with_rxing_with_bbox(image: GrayImage) -> Vec<Detection> {
     // Uses the rxing library, with a 'TryHarder' hint, for QR code detection.
     let mut result = Vec::new();
+    let image_width = image.width();
+    let image_height = image.height();
     let mut dch = DecodeHints {
         PossibleFormats: Some(HashSet::from([BarcodeFormat::QR_CODE])),
         TryHarder: Some(true),
         ..Default::default()
     };
     let decode_result = rxing::helpers::detect_multiple_in_luma_with_hints(
-        image.as_raw().clone(),
-        image.width(),
-        image.height(),
+        image.into_vec(),
+        image_width,
+        image_height,
         &mut dch,
     );
     let decoded = match decode_result {
@@ -201,7 +207,7 @@ fn with_rxing_with_bbox(image: &GrayImage) -> Vec<Detection> {
             .iter()
             .map(|point| (point.x, point.y))
             .collect();
-        let Some(bbox) = bbox_from_points(&points, image.width(), image.height()) else {
+        let Some(bbox) = bbox_from_points(&points, image_width, image_height) else {
             continue;
         };
         result.push(Detection {
