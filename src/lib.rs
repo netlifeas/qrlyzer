@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use fast_image_resize as fr;
-use image::{DynamicImage, GrayImage};
+use image::GrayImage;
 use imageproc::contrast::{otsu_level, threshold, ThresholdType};
 use pyo3::{
     exceptions::{PyIOError, PyValueError},
@@ -40,7 +40,6 @@ macro_rules! try_return {
 pub fn detect_and_decode(py: Python, path: &str, auto_resize: bool) -> PyResult<Vec<String>> {
     py.detach(move || {
         let image = load_image(path)?;
-        let image = DynamicImage::from(image.into_luma8());
         Ok(do_detect_and_decode(&image, auto_resize).unwrap_or_default())
     })
 }
@@ -71,7 +70,6 @@ pub fn detect_and_decode_with_bbox(
 ) -> PyResult<Vec<DecodedWithBoundingBox>> {
     py.detach(move || {
         let image = load_image(path)?;
-        let image = DynamicImage::from(image.into_luma8());
         Ok(do_detect_and_decode_with_bbox(&image, auto_resize)
             .unwrap_or_default()
             .into_iter()
@@ -100,7 +98,7 @@ pub fn detect_and_decode_from_bytes_with_bbox(
     })
 }
 
-fn do_detect_and_decode(image: &DynamicImage, auto_resize: bool) -> Option<Vec<String>> {
+fn do_detect_and_decode(image: &GrayImage, auto_resize: bool) -> Option<Vec<String>> {
     do_detect_and_decode_with_bbox(image, auto_resize).map(|detections| {
         detections
             .into_iter()
@@ -109,10 +107,7 @@ fn do_detect_and_decode(image: &DynamicImage, auto_resize: bool) -> Option<Vec<S
     })
 }
 
-fn do_detect_and_decode_with_bbox(
-    image: &DynamicImage,
-    auto_resize: bool,
-) -> Option<Vec<Detection>> {
+fn do_detect_and_decode_with_bbox(image: &GrayImage, auto_resize: bool) -> Option<Vec<Detection>> {
     let mut decoded: Vec<Detection> = Vec::new();
     if auto_resize {
         // Determine scaling factor range based on image dimensions.
@@ -130,7 +125,7 @@ fn do_detect_and_decode_with_bbox(
             if let Some(resized) = resized {
                 let thresholded = apply_threshold(&resized);
                 let rqrr_result = scale_detections_to_original(
-                    with_rqrr_with_bbox(thresholded.into_luma8()),
+                    with_rqrr_with_bbox(thresholded),
                     scale,
                     image.width(),
                     image.height(),
@@ -147,7 +142,7 @@ fn do_detect_and_decode_with_bbox(
         }
     }
     let thresholded = apply_threshold(image);
-    try_return!(decoded, with_rqrr_with_bbox(thresholded.into_luma8()));
+    try_return!(decoded, with_rqrr_with_bbox(thresholded));
     try_return!(decoded, with_rxing_with_bbox(image));
     Some(decoded)
 }
@@ -179,7 +174,7 @@ fn with_rqrr_with_bbox(image: GrayImage) -> Vec<Detection> {
     result
 }
 
-fn with_rxing_with_bbox(image: &DynamicImage) -> Vec<Detection> {
+fn with_rxing_with_bbox(image: &GrayImage) -> Vec<Detection> {
     // Uses the rxing library, with a 'TryHarder' hint, for QR code detection.
     let mut result = Vec::new();
     let mut dch = DecodeHints {
@@ -188,7 +183,7 @@ fn with_rxing_with_bbox(image: &DynamicImage) -> Vec<Detection> {
         ..Default::default()
     };
     let decode_result = rxing::helpers::detect_multiple_in_luma_with_hints(
-        image.to_luma8().into_vec(),
+        image.as_raw().clone(),
         image.width(),
         image.height(),
         &mut dch,
@@ -217,7 +212,7 @@ fn with_rxing_with_bbox(image: &DynamicImage) -> Vec<Detection> {
     result
 }
 
-fn image_from_bytes(data: Vec<u8>, width: u32, height: u32) -> PyResult<DynamicImage> {
+fn image_from_bytes(data: Vec<u8>, width: u32, height: u32) -> PyResult<GrayImage> {
     if data.len() != (width as usize * height as usize) {
         return PyResult::Err(PyValueError::new_err(
             "Data length does not match width and height",
@@ -225,47 +220,40 @@ fn image_from_bytes(data: Vec<u8>, width: u32, height: u32) -> PyResult<DynamicI
     }
     let image_result = GrayImage::from_raw(width, height, data);
     let image = match image_result {
-        Some(image) => DynamicImage::from(image),
+        Some(image) => image,
         None => return PyResult::Err(PyValueError::new_err("Could not create image")),
     };
     Ok(image)
 }
 
-fn load_image(path: &str) -> PyResult<DynamicImage> {
+fn load_image(path: &str) -> PyResult<GrayImage> {
     let image = image::open(path);
     match image {
-        Ok(image) => PyResult::Ok(image),
+        Ok(image) => PyResult::Ok(image.into_luma8()),
         Err(image_err) => PyResult::Err(PyIOError::new_err(image_err.to_string())),
     }
 }
 
 /// Applies Otsu's thresholding to enhance the image contrast.
-fn apply_threshold(image: &DynamicImage) -> DynamicImage {
-    let luma8 = match image.as_luma8() {
-        Some(luma8) => luma8,
-        None => {
-            // This should never happen, but if it does, return a copy of the original image.
-            return image.clone();
-        }
-    };
-
-    let thresh = otsu_level(luma8);
-    DynamicImage::from(threshold(luma8, thresh, ThresholdType::Binary))
+fn apply_threshold(image: &GrayImage) -> GrayImage {
+    let thresh = otsu_level(image);
+    threshold(image, thresh, ThresholdType::Binary)
 }
 
 /// Resizes the image based on the target scale and converts it back to a GrayImage.
-fn resize_image(image: &DynamicImage, target_scale: f32) -> Option<DynamicImage> {
-    let mut dst_image = DynamicImage::new_luma8(
-        (image.width() as f32 * target_scale) as u32,
-        (image.height() as f32 * target_scale) as u32,
-    );
+fn resize_image(image: &GrayImage, target_scale: f32) -> Option<GrayImage> {
+    let width = (image.width() as f32 * target_scale) as u32;
+    let height = (image.height() as f32 * target_scale) as u32;
+    if width == 0 || height == 0 {
+        return None;
+    }
 
+    let mut dst_image = GrayImage::new(width, height);
     let mut resizer = fr::Resizer::new();
-    let dst_image = match resizer.resize(image, &mut dst_image, &fr::ResizeOptions::default()) {
-        Ok(_) => dst_image,
-        Err(_) => return None,
-    };
-    Some(dst_image)
+    match resizer.resize(image, &mut dst_image, &fr::ResizeOptions::default()) {
+        Ok(_) => Some(dst_image),
+        Err(_) => None,
+    }
 }
 
 fn bbox_from_points(
