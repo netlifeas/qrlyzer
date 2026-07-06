@@ -9,9 +9,9 @@ name = "qrlyzer"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-fast_image_resize = { version = "6.0.0", features = ["image"] }
-image = "0.25.10"
-imageproc = "0.27.0"
+fast_image_resize = { version = "6.0.0", features = ["image", "rayon"] }
+image = { version = "0.25.10", default-features = false, features = ["bmp", "jpeg", "png", "tiff", "webp"] }
+imageproc = { version = "0.27.0", default-features = false }
 pyo3 = "0.29.0"
 rqrr = "0.10.1"
 rxing = { version = "0.9.1", default-features = false, features = ["decoders", "encoding_rs", "multi_barcode_readers", "qrcode"] }
