@@ -1108,7 +1108,7 @@ dependencies = [
 
 [[package]]
 name = "qrlyzer"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "fast_image_resize",
  "image",
