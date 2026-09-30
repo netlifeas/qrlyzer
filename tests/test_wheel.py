@@ -124,8 +124,12 @@ def test_jpeg_detection_uses_original_coordinates(
     path = tmp_path / "qr.jpg"
     image.convert(mode).save(path, quality=90, progressive=progressive)
 
-    assert qrlyzer.detect_and_decode(str(path), auto_resize=True) == ["qrlyzer"]
-    results = qrlyzer.detect_and_decode_with_bbox(str(path), auto_resize=True)
+    assert qrlyzer.detect_and_decode(
+        str(path), auto_resize=True, jpeg_fast_path=True
+    ) == ["qrlyzer"]
+    results = qrlyzer.detect_and_decode_with_bbox(
+        str(path), auto_resize=True, jpeg_fast_path=True
+    )
     assert len(results) == 1
     content, (x, y, width, height) = results[0]
     assert content == "qrlyzer"
@@ -152,8 +156,12 @@ def test_jpeg_tiny_qr_survives_full_resolution_fallback(tmp_path):
     ) == []
     expected = qrlyzer.detect_and_decode_with_bbox(str(path), auto_resize=False)
     assert [content for content, _ in expected] == ["qrlyzer"]
-    assert qrlyzer.detect_and_decode_with_bbox(str(path), auto_resize=True) == expected
-    assert qrlyzer.detect_and_decode(str(path), auto_resize=True) == ["qrlyzer"]
+    assert qrlyzer.detect_and_decode_with_bbox(
+        str(path), auto_resize=True, jpeg_fast_path=True
+    ) == expected
+    assert qrlyzer.detect_and_decode(
+        str(path), auto_resize=True, jpeg_fast_path=True
+    ) == ["qrlyzer"]
 
 
 @pytest.mark.parametrize("with_bbox", [False, True])
@@ -163,9 +171,34 @@ def test_jpeg_no_qr_and_invalid_data(tmp_path, with_bbox):
     )
     path = tmp_path / "blank.jpg"
     Image.new("RGB", (3000, 2000), "white").save(path)
-    assert detect(str(path), auto_resize=True) == []
+    assert detect(str(path), auto_resize=True, jpeg_fast_path=True) == []
     path.write_bytes(b"\xff\xd8invalid JPEG")
     with pytest.raises(OSError):
-        detect(str(path), auto_resize=True)
+        detect(str(path), auto_resize=True, jpeg_fast_path=True)
     with pytest.raises(OSError):
-        detect(str(tmp_path / "missing.jpg"), auto_resize=True)
+        detect(str(tmp_path / "missing.jpg"), auto_resize=True, jpeg_fast_path=True)
+
+
+@pytest.mark.parametrize("auto_resize", [False, True])
+def test_jpeg_default_matches_full_resolution_pixels(tmp_path, auto_resize):
+    image = Image.new("L", (6001, 4003), 255)
+    code = Image.open("tests/fixtures/test.png").convert("L")
+    image.paste(code.resize((1600, 1600), Image.Resampling.NEAREST), (4301, 2303))
+    path = tmp_path / "full.jpg"
+    image.save(path, quality=90)
+    with Image.open(path) as decoded:
+        expected = qrlyzer.detect_and_decode_from_bytes_with_bbox(
+            decoded.tobytes(), decoded.width, decoded.height, auto_resize=auto_resize
+        )
+    assert [text for text, _ in expected] == ["qrlyzer"]
+    assert qrlyzer.detect_and_decode_with_bbox(
+        str(path), auto_resize=auto_resize
+    ) == expected
+    assert qrlyzer.detect_and_decode_with_bbox(
+        str(path), auto_resize=auto_resize, jpeg_fast_path=False
+    ) == expected
+    assert qrlyzer.detect_and_decode(str(path), auto_resize=auto_resize) == ["qrlyzer"]
+    if not auto_resize:
+        assert qrlyzer.detect_and_decode_with_bbox(
+            str(path), jpeg_fast_path=True
+        ) == expected

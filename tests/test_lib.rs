@@ -17,7 +17,7 @@ fn assert_bbox_within_image(bbox: (u32, u32, u32, u32), width: u32, height: u32)
 fn test_detect_and_decode_invalid_file() {
     Python::initialize();
     Python::attach(|py| {
-        let result = detect_and_decode(py, "non_existent_file.png", false);
+        let result = detect_and_decode(py, "non_existent_file.png", false, false);
         assert!(result.is_err());
     });
 }
@@ -58,7 +58,7 @@ fn test_detect_and_decode_blank_image_file() {
     image.save(&file_path).unwrap();
 
     Python::attach(|py| {
-        let result = detect_and_decode(py, file_path.to_str().unwrap(), false).unwrap();
+        let result = detect_and_decode(py, file_path.to_str().unwrap(), false, false).unwrap();
         // Should return an empty vector as no QR code is present.
         assert!(result.is_empty());
     });
@@ -72,7 +72,7 @@ fn test_detect_and_decode_success_file() {
     Python::initialize();
     Python::attach(|py| {
         let file_path = "tests/fixtures/test.png";
-        let result = detect_and_decode(py, file_path, false).unwrap();
+        let result = detect_and_decode(py, file_path, false, false).unwrap();
         assert_eq!(result, vec!["qrlyzer".to_string()]);
     });
 }
@@ -94,7 +94,7 @@ fn test_detect_and_decode_success_file_requires_resize() {
     Python::initialize();
     Python::attach(|py| {
         let file_path = "tests/fixtures/test_resize.png";
-        let result = detect_and_decode(py, file_path, true).unwrap();
+        let result = detect_and_decode(py, file_path, true, false).unwrap();
         assert_eq!(result, vec!["qrlyzer".to_string()]);
     });
 }
@@ -104,7 +104,7 @@ fn test_detect_and_decode_failure_file_requires_resize() {
     Python::initialize();
     Python::attach(|py| {
         let file_path = "tests/fixtures/test_resize.png";
-        let result = detect_and_decode(py, file_path, false).unwrap();
+        let result = detect_and_decode(py, file_path, false, false).unwrap();
         assert_eq!(result, [] as [&str; 0]);
     });
 }
@@ -115,7 +115,7 @@ fn test_detect_and_decode_with_bbox_success_file() {
     Python::attach(|py| {
         let file_path = "tests/fixtures/test.png";
         let image = image::open(file_path).unwrap().to_luma8();
-        let result = detect_and_decode_with_bbox(py, file_path, false).unwrap();
+        let result = detect_and_decode_with_bbox(py, file_path, false, false).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].0, "qrlyzer");
         assert_bbox_within_image(result[0].1, image.width(), image.height());
@@ -128,7 +128,7 @@ fn test_detect_and_decode_with_bbox_success_file_requires_resize() {
     Python::attach(|py| {
         let file_path = "tests/fixtures/test_resize.png";
         let image = image::open(file_path).unwrap().to_luma8();
-        let result = detect_and_decode_with_bbox(py, file_path, true).unwrap();
+        let result = detect_and_decode_with_bbox(py, file_path, true, false).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].0, "qrlyzer");
         assert_bbox_within_image(result[0].1, image.width(), image.height());

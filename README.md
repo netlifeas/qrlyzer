@@ -36,7 +36,7 @@ print(f"Found QR codes: {qr_codes}")
 from PIL import Image
 im = Image.open("my_image.jpg")
 im = im.convert("L")
-qr_codes = qrlyzer.detect_and_decode_from_bytes(im.to_bytes(), im.width, im.height)
+qr_codes = qrlyzer.detect_and_decode_from_bytes(im.tobytes(), im.width, im.height)
 print(f"Found QR codes: {qr_codes}")
 ```
 
@@ -48,17 +48,8 @@ qrlyzer.detect_and_decode("my_image.jpg", auto_resize=True)
 ```
 Note: This can in some cases increase accuracy as well as speed, especially for large images where there is a QR code. If an image does not contain a QR code or the QR code is unreadable it will be slower.
 
-For JPEG files, auto-resizing first tries reduced-resolution IDCT decoding with
-`jpeg-decoder` when a 1/2, 1/4, or 1/8 decode can retain at least 1280 pixels
-in one dimension. This avoids allocating the full-resolution pixel image for
-successful scans. If the scaled scan finds no QR codes, or the JPEG is unsupported
-by the fast path, the existing full-resolution decoder and detection pipeline are
-used. CMYK JPEGs, smaller JPEGs, non-JPEG formats, raw grayscale inputs, and
-`auto_resize=False` retain the existing decoding path.
-
-The extra attempt makes images with no readable QR or only tiny QR codes slower.
-Detection stops at the first successful scan, so a scaled result can omit smaller
-codes elsewhere in a multi-code image. This is not an exhaustive multi-scale scan.
+Auto-resizing still decodes the full-resolution source image by default. For
+optional reduced-resolution JPEG decoding, see [Performance suggestions](#performance-suggestions).
 
 #### Getting decoded text with bounding boxes (`xywh`)
 Use the bbox variants to get both content and coordinates. The bbox format is `(x, y, width, height)`.
@@ -75,6 +66,81 @@ results = qrlyzer.detect_and_decode_from_bytes_with_bbox(
     im.tobytes(), im.width, im.height
 )
 ```
+
+## Performance suggestions
+
+Benchmark with representative images, including tiny QR codes and images without
+codes. An optimization that helps successful scans can make unsuccessful ones slower.
+If you already have grayscale pixels, pass them to the raw-byte APIs to avoid
+decoding the same file again.
+
+### Opt into reduced-resolution JPEG decoding
+
+Both file APIs accept the keyword-only `jpeg_fast_path` option, **disabled by
+default**. Enable it together with `auto_resize=True`:
+
+```python
+import qrlyzer
+
+qr_codes = qrlyzer.detect_and_decode(
+    "my_image.jpg", auto_resize=True, jpeg_fast_path=True
+)
+# Also supported by detect_and_decode_with_bbox; boxes use original coordinates.
+```
+
+The fast path uses `jpeg-decoder` to decode at 1/2, 1/4, or 1/8 dimensions when
+the reduced image can retain at least 1280 pixels in one dimension. Large JPEGs
+with sufficiently large QR codes can need substantially less time and memory.
+Progressive JPEGs can benefit too, but generally save less memory.
+
+If the scaled scan finds no codes, or the fast-path decoder cannot handle the
+JPEG, qrlyzer retries with its existing full-resolution decoder and detection
+pipeline. A tiny code or an image without codes therefore pays for an extra decode
+and detection attempt. Leave the option off when these cases dominate your workload.
+CMYK and smaller JPEGs keep the existing decoder. Non-JPEG files are unaffected,
+and the option has no effect unless `auto_resize=True`. Raw-byte APIs do not accept it.
+
+Detection stops at the first successful scan: a scaled result can omit smaller
+codes elsewhere in a multi-code image. Fallback on an empty result does not make
+this an exhaustive scan. Bounding boxes remain in original-image coordinates,
+but their edges can differ slightly between decoding scales.
+
+### Use Pillow `.draft()` before loading JPEG pixels
+
+For applications already using Pillow, `Image.draft()` can request reduced-resolution
+JPEG decoding and grayscale output. Call it **immediately after `Image.open()`**,
+before `.load()`, `.convert()`, `.resize()`, or `.tobytes()` triggers decoding:
+
+```python
+from PIL import Image
+import qrlyzer
+
+path = "my_image.jpg"
+with Image.open(path) as image:
+    image.draft("L", (1280, 1280))
+    gray = image.convert("L")
+    qr_codes = qrlyzer.detect_and_decode_from_bytes(
+        gray.tobytes(), gray.width, gray.height, auto_resize=True
+    )
+
+# Raw-byte APIs cannot recover pixels discarded by Pillow. Reopen the original
+# through the file API if you want a full-resolution fallback on an empty result.
+if not qr_codes:
+    qr_codes = qrlyzer.detect_and_decode(path, auto_resize=True)
+print(qr_codes)
+```
+
+The draft size is a hint, not an exact resize; use the resulting image's actual
+dimensions. For example, a 6000×4000 JPEG may become 3000×2000 for this request,
+not 1280×1280. Unsupported formats can ignore the request. Calling `.resize()`
+after full decoding does not avoid the original decode time or peak pixel allocation.
+
+With `detect_and_decode_from_bytes_with_bbox`, boxes refer to the supplied draft
+pixels, not the original JPEG. To map them back, retain the original dimensions
+before `.draft()` and scale box edges by each axis's original-to-draft ratio,
+rounding left/top down and right/bottom up. The same tiny-code and multi-code
+limitations apply as with the built-in fast path.
+
 
 ## Uses 
 

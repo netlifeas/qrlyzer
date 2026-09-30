@@ -37,10 +37,15 @@ macro_rules! try_return {
 
 /// Scan QR codes from an image given as a path.
 #[pyfunction]
-#[pyo3(signature = (path, auto_resize=false))]
-pub fn detect_and_decode(py: Python, path: &str, auto_resize: bool) -> PyResult<Vec<String>> {
+#[pyo3(signature = (path, auto_resize=false, *, jpeg_fast_path=false))]
+pub fn detect_and_decode(
+    py: Python,
+    path: &str,
+    auto_resize: bool,
+    jpeg_fast_path: bool,
+) -> PyResult<Vec<String>> {
     py.detach(move || {
-        Ok(detect_file(path, auto_resize)?
+        Ok(detect_file(path, auto_resize, jpeg_fast_path)?
             .into_iter()
             .map(|detection| detection.content)
             .collect())
@@ -65,14 +70,15 @@ pub fn detect_and_decode_from_bytes(
 
 /// Scan QR codes from an image path and return decoded text with a bbox `(x, y, width, height)`.
 #[pyfunction]
-#[pyo3(signature = (path, auto_resize=false))]
+#[pyo3(signature = (path, auto_resize=false, *, jpeg_fast_path=false))]
 pub fn detect_and_decode_with_bbox(
     py: Python,
     path: &str,
     auto_resize: bool,
+    jpeg_fast_path: bool,
 ) -> PyResult<Vec<DecodedWithBoundingBox>> {
     py.detach(move || {
-        Ok(detect_file(path, auto_resize)?
+        Ok(detect_file(path, auto_resize, jpeg_fast_path)?
             .into_iter()
             .map(|detection| (detection.content, detection.bbox))
             .collect())
@@ -233,10 +239,10 @@ fn image_from_bytes(data: Vec<u8>, width: u32, height: u32) -> PyResult<GrayImag
     Ok(image)
 }
 
-fn detect_file(path: &str, auto_resize: bool) -> PyResult<Vec<Detection>> {
+fn detect_file(path: &str, auto_resize: bool, jpeg_fast_path: bool) -> PyResult<Vec<Detection>> {
     let mut reader =
         image::ImageReader::open(path).map_err(|error| PyIOError::new_err(error.to_string()))?;
-    if auto_resize && reader.format() == Some(image::ImageFormat::Jpeg) {
+    if jpeg_fast_path && auto_resize && reader.format() == Some(image::ImageFormat::Jpeg) {
         let mut input = reader.into_inner();
         if let Some((image, original_dimensions)) = load_scaled_jpeg(&mut input) {
             let decoded_dimensions = image.dimensions();
