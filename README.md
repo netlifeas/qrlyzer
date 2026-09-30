@@ -10,6 +10,9 @@ There is at least one top level domain that started using the name qrlyzer after
 
 ### Installing
 
+Requires Python 3.11 or newer. CI tests Python 3.11–3.15, enabling prerelease
+interpreter resolution only for Python 3.15. Source builds require maturin 1.15 or newer.
+
 qrlyzer is available on PyPi. Install it with:
 
 ```bash
