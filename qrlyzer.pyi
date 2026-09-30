@@ -13,6 +13,9 @@ def detect_and_decode(
     Loads the image from the given path, converts it to grayscale, and applies
     thresholding. If ``auto_resize`` is enabled, the image is resized at various
     scales to improve detection using multiple libraries.
+    Large JPEGs first use reduced-resolution IDCT decoding, falling back to the
+    full-resolution decoder if no QR is found. Detection stops at the first
+    successful scan and can omit smaller codes in multi-code images.
 
     Args:
         image_path: The path to the image file.
@@ -49,8 +52,11 @@ def detect_and_decode_with_bbox(
     """
     Scans an image file for QR codes and returns decoded values with bounding boxes.
 
-    Bounding boxes are returned in ``(x, y, width, height)`` format where
-    ``x`` and ``y`` are the top-left pixel coordinates.
+    Bounding boxes are returned in original-image coordinates as
+    ``(x, y, width, height)``, where ``x`` and ``y`` are the top-left coordinates.
+    With ``auto_resize``, large JPEGs first use reduced-resolution IDCT decoding
+    and fall back to full resolution if no QR is found. Detection stops at the
+    first successful scan and can omit smaller codes in multi-code images.
 
     Args:
         image_path: The path to the image file.

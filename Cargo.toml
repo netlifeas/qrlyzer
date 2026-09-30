@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 fast_image_resize = { version = "6.1.0", features = ["image", "rayon"] }
 image = { version = "0.25.10", default-features = false, features = ["bmp", "jpeg", "png", "tiff", "webp"] }
 imageproc = { version = "0.27.0", default-features = false }
+jpeg-decoder = "0.3.2"
 pyo3 = "0.29.2"
 rqrr = "0.11.0"
 rxing = { version = "0.9.3", default-features = false, features = ["decoders", "encoding_rs", "multi_barcode_readers", "qrcode"] }

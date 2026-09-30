@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::io::{Read, Seek};
 
 use fast_image_resize as fr;
 use image::GrayImage;
@@ -39,8 +40,10 @@ macro_rules! try_return {
 #[pyo3(signature = (path, auto_resize=false))]
 pub fn detect_and_decode(py: Python, path: &str, auto_resize: bool) -> PyResult<Vec<String>> {
     py.detach(move || {
-        let image = load_image(path)?;
-        Ok(do_detect_and_decode(image, auto_resize).unwrap_or_default())
+        Ok(detect_file(path, auto_resize)?
+            .into_iter()
+            .map(|detection| detection.content)
+            .collect())
     })
 }
 
@@ -69,9 +72,7 @@ pub fn detect_and_decode_with_bbox(
     auto_resize: bool,
 ) -> PyResult<Vec<DecodedWithBoundingBox>> {
     py.detach(move || {
-        let image = load_image(path)?;
-        Ok(do_detect_and_decode_with_bbox(image, auto_resize)
-            .unwrap_or_default()
+        Ok(detect_file(path, auto_resize)?
             .into_iter()
             .map(|detection| (detection.content, detection.bbox))
             .collect())
@@ -232,12 +233,81 @@ fn image_from_bytes(data: Vec<u8>, width: u32, height: u32) -> PyResult<GrayImag
     Ok(image)
 }
 
-fn load_image(path: &str) -> PyResult<GrayImage> {
-    let image = image::open(path);
-    match image {
-        Ok(image) => PyResult::Ok(image.into_luma8()),
-        Err(image_err) => PyResult::Err(PyIOError::new_err(image_err.to_string())),
+fn detect_file(path: &str, auto_resize: bool) -> PyResult<Vec<Detection>> {
+    let mut reader =
+        image::ImageReader::open(path).map_err(|error| PyIOError::new_err(error.to_string()))?;
+    if auto_resize && reader.format() == Some(image::ImageFormat::Jpeg) {
+        let mut input = reader.into_inner();
+        if let Some((image, original_dimensions)) = load_scaled_jpeg(&mut input) {
+            let decoded_dimensions = image.dimensions();
+            let mut detections = do_detect_and_decode_with_bbox(image, true).unwrap_or_default();
+            if !detections.is_empty() {
+                for detection in &mut detections {
+                    detection.bbox =
+                        map_jpeg_bbox(detection.bbox, decoded_dimensions, original_dimensions);
+                }
+                return Ok(detections);
+            }
+        }
+        // Unsupported JPEGs, decode failures, and empty scaled scans retain the
+        // existing decoder's full-resolution behavior and error reporting.
+        input
+            .rewind()
+            .map_err(|error| PyIOError::new_err(error.to_string()))?;
+        reader = image::ImageReader::with_format(input, image::ImageFormat::Jpeg);
     }
+    let image = reader
+        .decode()
+        .map_err(|error| PyIOError::new_err(error.to_string()))?;
+    Ok(do_detect_and_decode_with_bbox(image.into_luma8(), auto_resize).unwrap_or_default())
+}
+
+fn load_scaled_jpeg(input: impl Read) -> Option<(GrayImage, (u32, u32))> {
+    use jpeg_decoder::{Decoder, PixelFormat};
+
+    let mut decoder = Decoder::new(input);
+    if let Some(limit) = image::Limits::default().max_alloc {
+        decoder.set_max_decoding_buffer_size(usize::try_from(limit).unwrap_or(usize::MAX));
+    }
+    decoder.read_info().ok()?;
+    let info = decoder.info()?;
+    if !matches!(info.pixel_format, PixelFormat::L8 | PixelFormat::RGB24) {
+        return None;
+    }
+    let original = (u32::from(info.width), u32::from(info.height));
+    let target = MAX_TARGET_DIMENSION as u16;
+    let (width, height) = decoder.scale(target, target).ok()?;
+    let dimensions = (u32::from(width), u32::from(height));
+    if dimensions == original {
+        return None;
+    }
+    let pixels = decoder.decode().ok()?;
+    let image = match info.pixel_format {
+        PixelFormat::L8 => GrayImage::from_raw(dimensions.0, dimensions.1, pixels)?,
+        PixelFormat::RGB24 => image::DynamicImage::ImageRgb8(image::RgbImage::from_raw(
+            dimensions.0,
+            dimensions.1,
+            pixels,
+        )?)
+        .into_luma8(),
+        _ => unreachable!("unsupported pixel formats were excluded before decoding"),
+    };
+    Some((image, original))
+}
+
+fn map_jpeg_bbox(bbox: BoundingBox, decoded: (u32, u32), original: (u32, u32)) -> BoundingBox {
+    let (x, y, width, height) = bbox;
+    // IDCT rounds each dimension independently. Map edges with exact integer
+    // ratios, rounding outwards so the original-coordinate box contains them.
+    let left = (u64::from(x) * u64::from(original.0) / u64::from(decoded.0)) as u32;
+    let top = (u64::from(y) * u64::from(original.1) / u64::from(decoded.1)) as u32;
+    let right = (u64::from(x + width) * u64::from(original.0))
+        .div_ceil(u64::from(decoded.0))
+        .min(u64::from(original.0)) as u32;
+    let bottom = (u64::from(y + height) * u64::from(original.1))
+        .div_ceil(u64::from(decoded.1))
+        .min(u64::from(original.1)) as u32;
+    (left, top, right - left, bottom - top)
 }
 
 /// Applies Otsu's thresholding to enhance the image contrast.
@@ -360,4 +430,24 @@ fn qrlyzer(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(detect_and_decode_with_bbox, m)?)?;
     m.add_function(wrap_pyfunction!(detect_and_decode_from_bytes_with_bbox, m)?)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::map_jpeg_bbox;
+
+    #[test]
+    fn jpeg_bbox_rounds_outwards_at_odd_dimensions_and_image_edges() {
+        let decoded = (1501, 1001);
+        let original = (6001, 4003);
+        assert_eq!(map_jpeg_bbox((1, 1, 1, 1), decoded, original), (3, 3, 5, 5));
+        assert_eq!(
+            map_jpeg_bbox((1500, 1000, 1, 1), decoded, original),
+            (5997, 3999, 4, 4),
+        );
+        assert_eq!(
+            map_jpeg_bbox((0, 0, 1501, 1001), decoded, original),
+            (0, 0, 6001, 4003),
+        );
+    }
 }

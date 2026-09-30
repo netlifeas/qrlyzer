@@ -100,3 +100,72 @@ def test_detect_and_decode_from_bytes_with_bbox_needs_resize_success():
     content, bbox = output[0]
     assert content == "qrlyzer"
     _assert_bbox_within_image(bbox, im.width, im.height)
+
+
+@pytest.mark.parametrize(
+    "mode,progressive,size,qr_size",
+    [
+        ("RGB", False, (6001, 4003), 1600),
+        ("RGB", True, (6001, 4003), 1600),
+        ("L", False, (6001, 4003), 1600),
+        ("CMYK", False, (6001, 4003), 1600),
+        ("RGB", False, (1024, 768), 400),
+        ("RGB", False, (2000, 1333), 600),
+    ],
+)
+def test_jpeg_detection_uses_original_coordinates(
+    tmp_path, mode, progressive, size, qr_size
+):
+    image = Image.new("RGB", size, "white")
+    code = Image.open("tests/fixtures/test.png").convert("RGB")
+    code = code.resize((qr_size, qr_size), Image.Resampling.NEAREST)
+    left, top = size[0] - qr_size - 100, size[1] - qr_size - 100
+    image.paste(code, (left, top))
+    path = tmp_path / "qr.jpg"
+    image.convert(mode).save(path, quality=90, progressive=progressive)
+
+    assert qrlyzer.detect_and_decode(str(path), auto_resize=True) == ["qrlyzer"]
+    results = qrlyzer.detect_and_decode_with_bbox(str(path), auto_resize=True)
+    assert len(results) == 1
+    content, (x, y, width, height) = results[0]
+    assert content == "qrlyzer"
+    _assert_bbox_within_image((x, y, width, height), *size)
+    assert left <= x < left + qr_size // 3
+    assert top <= y < top + qr_size // 3
+    assert left + 2 * qr_size // 3 < x + width <= left + qr_size
+    assert top + 2 * qr_size // 3 < y + height <= top + qr_size
+
+
+def test_jpeg_tiny_qr_survives_full_resolution_fallback(tmp_path):
+    image = Image.new("RGB", (6000, 4000), "white")
+    code = Image.open("tests/fixtures/test.png").convert("RGB")
+    image.paste(code.resize((100, 100), Image.Resampling.NEAREST), (2950, 1950))
+    path = tmp_path / "tiny.jpg"
+    image.save(path, quality=90)
+
+    # The QR is unreadable at the IDCT preview size but readable in the source.
+    preview = Image.open(path)
+    preview.draft("L", (1500, 1000))
+    preview = preview.convert("L")
+    assert qrlyzer.detect_and_decode_from_bytes(
+        preview.tobytes(), preview.width, preview.height, auto_resize=True
+    ) == []
+    expected = qrlyzer.detect_and_decode_with_bbox(str(path), auto_resize=False)
+    assert [content for content, _ in expected] == ["qrlyzer"]
+    assert qrlyzer.detect_and_decode_with_bbox(str(path), auto_resize=True) == expected
+    assert qrlyzer.detect_and_decode(str(path), auto_resize=True) == ["qrlyzer"]
+
+
+@pytest.mark.parametrize("with_bbox", [False, True])
+def test_jpeg_no_qr_and_invalid_data(tmp_path, with_bbox):
+    detect = (
+        qrlyzer.detect_and_decode_with_bbox if with_bbox else qrlyzer.detect_and_decode
+    )
+    path = tmp_path / "blank.jpg"
+    Image.new("RGB", (3000, 2000), "white").save(path)
+    assert detect(str(path), auto_resize=True) == []
+    path.write_bytes(b"\xff\xd8invalid JPEG")
+    with pytest.raises(OSError):
+        detect(str(path), auto_resize=True)
+    with pytest.raises(OSError):
+        detect(str(tmp_path / "missing.jpg"), auto_resize=True)

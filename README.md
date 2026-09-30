@@ -48,8 +48,22 @@ qrlyzer.detect_and_decode("my_image.jpg", auto_resize=True)
 ```
 Note: This can in some cases increase accuracy as well as speed, especially for large images where there is a QR code. If an image does not contain a QR code or the QR code is unreadable it will be slower.
 
+For JPEG files, auto-resizing first tries reduced-resolution IDCT decoding with
+`jpeg-decoder` when a 1/2, 1/4, or 1/8 decode can retain at least 1280 pixels
+in one dimension. This avoids allocating the full-resolution pixel image for
+successful scans. If the scaled scan finds no QR codes, or the JPEG is unsupported
+by the fast path, the existing full-resolution decoder and detection pipeline are
+used. CMYK JPEGs, smaller JPEGs, non-JPEG formats, raw grayscale inputs, and
+`auto_resize=False` retain the existing decoding path.
+
+The extra attempt makes images with no readable QR or only tiny QR codes slower.
+Detection stops at the first successful scan, so a scaled result can omit smaller
+codes elsewhere in a multi-code image. This is not an exhaustive multi-scale scan.
+
 #### Getting decoded text with bounding boxes (`xywh`)
 Use the bbox variants to get both content and coordinates. The bbox format is `(x, y, width, height)`.
+Coordinates always refer to the original image dimensions, including when JPEG
+IDCT scaling is used. Box edges can differ slightly between decoding scales.
 ```python
 results = qrlyzer.detect_and_decode_with_bbox("my_image.jpg")
 for content, (x, y, width, height) in results:
@@ -68,6 +82,7 @@ results = qrlyzer.detect_and_decode_from_bytes_with_bbox(
 * [rqrr](https://github.com/WanzenBug/rqrr/) - Reading QR codes
 * [rxing](https://github.com/rxing-core/rxing/) - Reading QR codes
 * [fast_image_resize](https://github.com/cykooz/fast_image_resize/) - Image resizing 
+* [jpeg-decoder](https://github.com/image-rs/jpeg-decoder) - Reduced-resolution JPEG decoding
 
 ## Authors
 
